@@ -1,4 +1,15 @@
-# Updated to compile on FreeBSD, Linux, macOS and Windows
+# Lightweight Networking Library (Fork pavelm75/lnet)
+
+New features:
+
+* A small tweak in lFTP, which allows changing the modified date time of the transferred file on the FTP server
+
+Copyright (c) 2005-2018 by Ales Katona and Micha Nelissen.
+Copyright (c) 2022-2024 by Pavel Mokry.
+
+# Original ReadMe Content (almindor/lnet)
+
+## Updated to compile on FreeBSD, Linux, macOS and Windows
 
 Quite a few changes were required, but all the examples now compile with FPC 3.2.2 or 3.3.1 on:
 
@@ -16,8 +27,6 @@ Instructions:
 3) run make (this compiles the library and console examples - there are no Cocoa/Carbon hooks for the visual components, so they do not compile for macOS)
 4) For Lazarus, add the path to lnet-master/lib to the Project Options > Paths - "Other unit files" OR
 5) For FPC, use -Fu to add the path to lnet-master/lib
-
-# Original ReadMe Content
 
 ## Lightweight Networking Library
 

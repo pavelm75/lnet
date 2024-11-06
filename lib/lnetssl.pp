@@ -25,7 +25,7 @@ type
     FSSL: PSSL;
     FSSLContext: PSSL_CTX;
     FSSLStatus: TLSSLStatus;
-    FIsAcceptor: Boolean;
+    //FIsAcceptor: Boolean; //Defined already in THandle
     function GetConnected: Boolean; override; deprecated;
     function GetConnectionStatus: TLSocketConnectionStatus; override;
 

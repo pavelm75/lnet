@@ -1,4 +1,7 @@
-{ lFTP CopyRight (C) 2005-2008 Ales Katona
+{ lFTP
+
+  CopyRight (C) 2005-2008 Ales Katona
+  feature/lFTP-MDTM-MFMT CopyRight (C) 2020-2024 Pavel Mokry
 
   This library is Free software; you can rediStribute it and/or modify it
   under the terms of the GNU Library General Public License as published by
@@ -38,9 +41,13 @@ type
   TLFTP = class;
   TLFTPClient = class;
 
-  TLFTPStatus = (fsNone, fsCon, fsUser, fsPass, fsPasv, fsPort, fsList, fsRetr,
-                 fsStor, fsType, fsCWD, fsMKD, fsRMD, fsDEL, fsRNFR, fsRNTO,
-                 fsSYS, fsFeat, fsPWD, fsHelp, fsQuit, fsLast);
+  TLFTPStatus = (
+  	fsNone{0}, fsCon{1}, fsUser{2}, fsPass{3}, fsPasv{4},
+    fsPort{5}, fsList{6}, fsRetr{7}, fsStor{8}, fsType{9},
+    fsCWD{10}, fsMKD{11}, fsRMD{12}, fsDEL{13}, fsRNFR{14},
+    fsRNTO{15}, fsSYS{16}, fsFeat{17}, fsPWD{18}, fsHelp{19},
+    fsQuit{20}, fsLast{21}, fsMlsd{22}, fsMlst{23}, fsMfmt{24},
+    fsMdtm{25});
                  
   TLFTPStatusSet = set of TLFTPStatus;
                  
@@ -120,6 +127,7 @@ type
     FPipeLine: Boolean;
     FPassword: string;
     FPWD: string;
+    FParsedData: string;
     FStatusFlags: array[TLFTPStatus] of Boolean;
 
     FOnError: TLSocketErrorEvent;
@@ -206,9 +214,19 @@ type
     
     function DeleteFile(const FileName: string): Boolean;
     function Rename(const FromName, ToName: string): Boolean;
+
+    function GetFileModifiedTime(const AFileName: string): Boolean;
+
+    function ModifyFileModifiedTime(const AFileName: string; YYYMMDDHHMMSS: string): Boolean; overload;
+    function ModifyFileModifiedTime(const AFileName: string; Year, Month, Day, Hour, Minute, Second: word): Boolean; overload;
+    function ModifyFileModifiedTime(const AFileName: string; AFileModifiedDateTime: TDateTime): Boolean; overload;
    public
     procedure List(const FileName: string = '');
     procedure Nlst(const FileName: string = '');
+
+    procedure Mlsd(const FileName: string = '');
+    procedure Mlst(const FileName: string = '');
+
     procedure SystemInfo;
     procedure ListFeatures;
     procedure PresentWorkingDirectory;
@@ -229,6 +247,8 @@ type
     property Transfer: Boolean read GetTransfer;
     property CurrentStatus: TLFTPStatus read GetCurrentStatus;
     property PresentWorkingDirectoryString: string read FPWD;
+    property ParsedData: string read FParsedData;
+
 
     property OnError: TLSocketErrorEvent read FOnError write FOnError;
     property OnConnect: TLSocketEvent read FOnConnect write FOnConnect;
@@ -256,7 +276,8 @@ const
                                                 'Store', 'Type', 'CWD', 'MKDIR',
                                                 'RMDIR', 'Delete', 'RenameFrom',
                                                 'RenameTo', 'System', 'Features',
-                                                'PWD', 'HELP', 'QUIT', 'LAST');
+                                                'PWD', 'HELP', 'QUIT', 'LAST', 'MLSD',
+                                                'MLST', 'MFMT', 'MDTM');
 
 procedure Writedbg(const ar: array of const);
 {$ifdef debug}
@@ -702,8 +723,20 @@ begin
   x := GetNum;
   Writedbg(['WOULD EVAL: ', FTPStatusStr[FStatus.First.Status], ' with value: ',
             x, ' from "', Ans, '"']);
-  if FStatus.First.Status = fsFeat then
-    FFeatureString := FFeatureString + Ans + FLE; // we need to parse this later
+
+  case FStatus.First.Status of
+		fsFeat:
+      begin
+				FFeatureString := FFeatureString + Ans + FLE; // we need to parse this later
+			end;
+		fsMlst:
+      begin
+        if x < 0 then begin
+          FParsedData := Ans;
+				end;
+			end;
+	end;
+
 
   if ValidResponse(Ans) then
     if not FStatus.Empty then begin
@@ -936,6 +969,57 @@ begin
                        Eventize(FStatus.First.Status, False);
                      end;
                  end;
+
+        fsMlsd : case x of
+                   125, 150: begin { do nothing } end;
+                   226:
+                     begin
+                       Eventize(FStatus.First.Status, True);
+										 end;
+                   else
+                     begin
+                       Eventize(FStatus.First.Status, False);
+                     end;
+                 end;
+        fsMlst : case x of
+                   -1, 125, 150: begin { do nothing } end;
+                   250:
+                     begin
+                       if Ans[4] = '-' then begin
+                         FParsedData := '';
+											 end;
+                       if Ans[4] = ' ' then begin
+                         Eventize(FStatus.First.Status, True);
+											 end;
+										 end;
+                   else
+                     begin
+                       Eventize(FStatus.First.Status, False);
+                     end;
+                 end;
+        fsMfmt : case x of
+                   213, 253:
+                     begin
+                       Eventize(FStatus.First.Status, True);
+                     end;
+                   else
+                     begin
+                       Eventize(FStatus.First.Status, False);
+                     end;
+                 end;
+
+        fsMdtm : case x of
+                   213:
+                     begin
+                       FParsedData:=copy(Ans, 5, length(Ans) - 4);
+                       Eventize(FStatus.First.Status, True);
+                     end;
+                   else
+                     begin
+                       Eventize(FStatus.First.Status, False);
+                     end;
+                 end;
+
       end;
     end;
   if FStatus.Empty and not FCommandFront.Empty then
@@ -1038,6 +1122,9 @@ begin
       fsHelp : Help(Args[1]);
       fsType : SetBinary(StrToBool(Args[1]));
       fsFeat : ListFeatures;
+      fsMlsd : Mlsd(Args[1]);
+      fsMlst : Mlst(Args[1]);
+      fsMdtm : GetFileModifiedTime(Args[1]);
     end;
   FCommandFront.Remove;
 end;
@@ -1173,7 +1260,6 @@ begin
   Result := not FPipeLine;
   if CanContinue(fsDEL, FileName, '') then begin
     FStatus.Insert(MakeStatusRec(fsDEL, '', ''));
-    FStatusFlags[fsDEL] := False;
     FControl.SendMessage('DELE ' + FileName + FLE);
     Result := True;
   end;
@@ -1193,6 +1279,46 @@ begin
 
     Result := True;
   end;
+end;
+
+function TLFTPClient.GetFileModifiedTime(const AFileName: string): Boolean;
+begin
+  Result := not FPipeLine;
+  if CanContinue(fsMdtm, AFileName, '') and (FFeatureList.IndexOf('MDTM') >= 0) then begin
+    FStatus.Insert(MakeStatusRec(fsMdtm, '', ''));
+    FStatusFlags[fsMdtm] := False;
+    FControl.SendMessage('MDTM ' + AFileName + FLE);
+    Result := True;
+  end;
+end;
+
+function TLFTPClient.ModifyFileModifiedTime(const AFileName: string; YYYMMDDHHMMSS: string): Boolean; overload;
+begin
+  Result := not FPipeLine;
+  if CanContinue(fsMfmt, AFileName, YYYMMDDHHMMSS) and (FFeatureList.IndexOf('MFMT') >= 0) then begin
+    FStatus.Insert(MakeStatusRec(fsMfmt, '', ''));
+    FControl.SendMessage('MFMT ' + YYYMMDDHHMMSS + ' ' + AFileName + FLE);
+    Result := True;
+  end;
+end;
+
+
+function TLFTPClient.ModifyFileModifiedTime(const AFileName: string; Year, Month, Day, Hour, Minute, Second: word): Boolean;
+var
+  sDateTime: string;
+begin
+  Result := not FPipeLine;
+	sDateTime := Format('%.4d%.2d%.2d%.2d%.2d%.2d', [Year, Month, Day, Hour, Minute, Second]);
+  Result := ModifyFileModifiedTime(AFileName, sDateTime);
+end;
+
+function TLFTPClient.ModifyFileModifiedTime(const AFileName: string; AFileModifiedDateTime: TDateTime): Boolean;
+var
+  Year, Month, Day, Hour, Minute, Second, MilliSecond: word;
+begin
+  DecodeDate(AFileModifiedDateTime, Year, Month, Day);
+  DecodeTime(AFileModifiedDateTime, Hour, Minute, Second, MilliSecond);
+	Result := ModifyFileModifiedTime(AFileName, Year, Month, Day, Hour, Minute, Second);
 end;
 
 procedure TLFTPClient.List(const FileName: string = '');
@@ -1216,6 +1342,27 @@ begin
       FControl.SendMessage('NLST ' + FileName + FLE)
     else
       FControl.SendMessage('NLST' + FLE);
+  end;
+end;
+
+procedure TLFTPClient.Mlsd(const FileName: string = '');
+begin
+  if CanContinue(fsMlsd, FileName, '') then begin
+    PasvPort;
+    FStatus.Insert(MakeStatusRec(fsMlsd, '', ''));
+    if Length(FileName) > 0 then
+      FControl.SendMessage('MLSD ' + FileName + FLE)
+    else
+      FControl.SendMessage('MLSD' + FLE);
+  end;
+end;
+
+procedure TLFTPClient.Mlst(const FileName: string = '');
+begin
+  if CanContinue(fsMlst, FileName, '') then begin
+    FStatus.Insert(MakeStatusRec(fsMlst, '', ''));
+    FStatusFlags[fsMlst] := False;
+    FControl.SendMessage('MLST ' + FileName + FLE);
   end;
 end;
 

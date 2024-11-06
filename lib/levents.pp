@@ -1,6 +1,7 @@
 { lNet Events abstration
 
   CopyRight (C) 2006-2008 Ales Katona
+  feature/lFTP-MDTM-MFMT CopyRight (C) 2020-2024 Pavel Mokry
 
   This library is Free software; you can rediStribute it and/or modify it
   under the terms of the GNU Library General Public License as published by
@@ -60,6 +61,7 @@ type
     FIgnoreWrite: Boolean;   // so we can do edge-triggered
     FIgnoreRead: Boolean;    // so we can do edge-triggered
     FIgnoreError: Boolean;   // so we can do edge-triggered
+    FIsAcceptor: Boolean;    // if socket was server-accepted
     FDispose: Boolean;       // will free in the after-cycle
     FFreeing: Boolean;       // used to see if it's in the "to be freed" list
     FPrev: TLHandle;
@@ -508,14 +510,14 @@ begin
   if FTimeout.tv_sec < 0 then
     Result := -1
   else
-    Result := (FTimeout.tv_sec * 1000) + FTimeout.tv_usec;
+    Result := (FTimeout.tv_sec * 1000) + (FTimeout.tv_usec div 1000);
 end;
 
 procedure TLSelectEventer.SetTimeout(const Value: Integer);
 begin
   if Value >= 0 then begin
     FTimeout.tv_sec := Value div 1000;
-    FTimeout.tv_usec := Value mod 1000;
+    FTimeout.tv_usec := (Value mod 1000) * 1000;
   end else begin
     FTimeout.tv_sec := -1;
     FTimeout.tv_usec := 0;
