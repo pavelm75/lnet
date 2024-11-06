@@ -1184,7 +1184,7 @@ begin
      * This Issue is not solved yet.
      * if disconnect is called within a socket event then FRootSock is not allowed to be freed
      * if Disconnect is called outside a socket event then FRootSock needs to be freed otherwise
-     *   a memory leack is created.
+     * a memory leak is created.
      *
      * as the normal case is that disconnect is called from outside a socket event
      * the free method is choosen.
