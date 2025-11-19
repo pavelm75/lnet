@@ -33,33 +33,33 @@ interface
 
 uses
   Classes, lNet, lTelnet;
-  
+
 const
-  DEFAULT_FTP_PORT    = 1025;
+  DEFAULT_FTP_PORT = 1025;
 
 type
   TLFTP = class;
   TLFTPClient = class;
 
   TLFTPStatus = (
-  	fsNone{0}, fsCon{1}, fsUser{2}, fsPass{3}, fsPasv{4},
+    fsNone{0}, fsCon{1}, fsUser{2}, fsPass{3}, fsPasv{4},
     fsPort{5}, fsList{6}, fsRetr{7}, fsStor{8}, fsType{9},
     fsCWD{10}, fsMKD{11}, fsRMD{12}, fsDEL{13}, fsRNFR{14},
     fsRNTO{15}, fsSYS{16}, fsFeat{17}, fsPWD{18}, fsHelp{19},
     fsQuit{20}, fsLast{21}, fsMlsd{22}, fsMlst{23}, fsMfmt{24},
     fsMdtm{25});
-                 
+
   TLFTPStatusSet = set of TLFTPStatus;
-                 
+
   TLFTPStatusRec = record
     Status: TLFTPStatus;
     Args: array[1..2] of string;
   end;
-  
+
   TLFTPTransferMethod = (ftActive, ftPassive);
-                 
-  TLFTPClientStatusEvent = procedure (aSocket: TLSocket;
-                                     const aStatus: TLFTPStatus) of object;
+
+  TLFTPClientStatusEvent = procedure(aSocket: TLSocket;
+    const aStatus: TLFTPStatus) of object;
 
   { TLFTPStatusStack }
 
@@ -67,20 +67,20 @@ type
   {$DEFINE __front_type__  :=  TLFTPStatusRec}
   {$i lcontainersh.inc}
   TLFTPStatusFront = TLFront;
-  
+
   TLFTP = class(TLComponent, ILDirect)
-   protected
+  protected
     FControl: TLTelnetClient;
     FData: TLTcp;//TLTcpList;
-    FSending: Boolean;
+    FSending: boolean;
     FTransferMethod: TLFTPTransferMethod;
     FFeatureList: TStringList;
     FFeatureString: string;
 
-    function GetConnected: Boolean; virtual;
-    
-    function GetTimeout: Integer;
-    procedure SetTimeout(const Value: Integer);
+    function GetConnected: boolean; virtual;
+
+    function GetTimeout: integer;
+    procedure SetTimeout(const Value: integer);
 
     function GetSession: TLSession;
     procedure SetSession(const AValue: TLSession);
@@ -88,47 +88,51 @@ type
 
     function GetSocketClass: TLSocketClass;
     procedure SetSocketClass(Value: TLSocketClass);
-   public
+  public
     constructor Create(aOwner: TComponent); override;
     destructor Destroy; override;
-    
-    function Get(out aData; const aSize: Integer; aSocket: TLSocket = nil): Integer; virtual; abstract;
-    function GetMessage(out msg: string; aSocket: TLSocket = nil): Integer; virtual; abstract;
-    
-    function Send(const aData; const aSize: Integer; aSocket: TLSocket = nil): Integer; virtual; abstract;
-    function SendMessage(const msg: string; aSocket: TLSocket = nil): Integer; virtual; abstract;
-    
-   public
-    property Connected: Boolean read GetConnected;
-    property Timeout: Integer read GetTimeout write SetTimeout;
+
+    function Get(out aData; const aSize: integer; aSocket: TLSocket = nil): integer;
+      virtual; abstract;
+    function GetMessage(out msg: string; aSocket: TLSocket = nil): integer;
+      virtual; abstract;
+
+    function Send(const aData; const aSize: integer; aSocket: TLSocket = nil): integer;
+      virtual; abstract;
+    function SendMessage(const msg: string; aSocket: TLSocket = nil): integer;
+      virtual; abstract;
+  public
+    property Connected: boolean read GetConnected;
+    property Timeout: integer read GetTimeout write SetTimeout;
     property SocketClass: TLSocketClass read GetSocketClass write SetSocketClass;
     property ControlConnection: TLTelnetClient read FControl;
     property DataConnection: TLTCP read FData;
-    property TransferMethod: TLFTPTransferMethod read FTransferMethod write FTransferMethod default ftPassive;
+    property TransferMethod: TLFTPTransferMethod
+      read FTransferMethod write FTransferMethod default ftPassive;
     property Session: TLSession read GetSession write SetSession;
     property FeatureList: TStringList read FFeatureList;
   end;
 
   { TLFTPTelnetClient }
-  
+
   TLFTPTelnetClient = class(TLTelnetClient)
-   protected
-    procedure React(const Operation, Command: Char); override;
+  protected
+    procedure React(const Operation, Command: char); override;
   end;
 
   { TLFTPClient }
 
   TLFTPClient = class(TLFTP, ILClient)
-   protected
+  protected
     FStatus: TLFTPStatusFront;
     FCommandFront: TLFTPStatusFront;
     FStoreFile: TFileStream;
-    FExpectedBinary: Boolean;
-    FPipeLine: Boolean;
+    FExpectedBinary: boolean;
+    FPipeLine: boolean;
     FPassword: string;
     FPWD: string;
     FParsedData: string;
-    FStatusFlags: array[TLFTPStatus] of Boolean;
+    FStatusFlags: array[TLFTPStatus] of boolean;
 
     FOnError: TLSocketErrorEvent;
     FOnReceive: TLSocketEvent;
@@ -138,9 +142,9 @@ type
     FOnSuccess: TLFTPClientStatusEvent;
     FOnFailure: TLFTPClientStatusEvent;
 
-    FChunkSize: Word;
-    FLastPort: Word;
-    FStartPort: Word;
+    FChunkSize: word;
+    FLastPort: word;
+    FStartPort: word;
     FStatusSet: TLFTPStatusSet;
     FSL: TStringList; // for evaluation, I want to prevent constant create/free
     procedure OnRe(aSocket: TLSocket);
@@ -158,69 +162,75 @@ type
     procedure ClearStatusFlags;
 
     function GetCurrentStatus: TLFTPStatus;
-    function GetTransfer: Boolean;
+    function GetTransfer: boolean;
 
-    function GetEcho: Boolean;
-    procedure SetEcho(const Value: Boolean);
+    function GetEcho: boolean;
+    procedure SetEcho(const Value: boolean);
 
     procedure ParsePWD(const s: string);
 
-    function GetConnected: Boolean; override;
+    function GetConnected: boolean; override;
 
-    function GetBinary: Boolean;
-    procedure SetBinary(const Value: Boolean);
+    function GetBinary: boolean;
+    procedure SetBinary(const Value: boolean);
 
-    function CanContinue(const aStatus: TLFTPStatus; const Arg1, Arg2: string): Boolean;
+    function CanContinue(const aStatus: TLFTPStatus; const Arg1, Arg2: string): boolean;
 
-    function CleanInput(var s: string): Integer;
+    function CleanInput(var s: string): integer;
 
-    procedure SetStartPor(const Value: Word);
+    procedure SetStartPor(const Value: word);
 
     procedure EvaluateFeatures;
     procedure EvaluateAnswer(const Ans: string);
 
     procedure PasvPort;
 
-    function User(const aUserName: string): Boolean;
-    function Password(const aPassword: string): Boolean;
+    function User(const aUserName: string): boolean;
+    function Password(const aPassword: string): boolean;
 
-    procedure SendChunk(const Event: Boolean);
+    procedure SendChunk(const Event: boolean);
 
     procedure ExecuteFrontCommand;
-   public
+  public
     constructor Create(aOwner: TComponent); override;
     destructor Destroy; override;
 
-    function Get(out aData; const aSize: Integer; aSocket: TLSocket = nil): Integer; override;
-    function GetMessage(out msg: string; aSocket: TLSocket = nil): Integer; override;
-    
-    function Send(const aData; const aSize: Integer; aSocket: TLSocket = nil): Integer; override;
-    function SendMessage(const msg: string; aSocket: TLSocket = nil): Integer; override;
-    
-    function Connect(const aHost: string; const aPort: Word = 21): Boolean; virtual; overload;
-    function Connect: Boolean; virtual; overload;
-    
-    function Authenticate(const aUsername, aPassword: string): Boolean;
-    
-    function GetData(out aData; const aSize: Integer): Integer;
+    function Get(out aData; const aSize: integer; aSocket: TLSocket = nil): integer;
+      override;
+    function GetMessage(out msg: string; aSocket: TLSocket = nil): integer; override;
+
+    function Send(const aData; const aSize: integer; aSocket: TLSocket = nil): integer;
+      override;
+    function SendMessage(const msg: string; aSocket: TLSocket = nil): integer; override;
+
+    function Connect(const aHost: string; const aPort: word = 21): boolean;
+      virtual; overload;
+    function Connect: boolean; virtual; overload;
+
+    function Authenticate(const aUsername, aPassword: string): boolean;
+
+    function GetData(out aData; const aSize: integer): integer;
     function GetDataMessage: string;
-    
-    function Retrieve(const FileName: string): Boolean;
-    function Put(const FileName: string): Boolean; virtual; // because of LCLsocket
-    
-    function ChangeDirectory(const DestPath: string): Boolean;
-    function MakeDirectory(const DirName: string): Boolean;
-    function RemoveDirectory(const DirName: string): Boolean;
-    
-    function DeleteFile(const FileName: string): Boolean;
-    function Rename(const FromName, ToName: string): Boolean;
 
-    function GetFileModifiedTime(const AFileName: string): Boolean;
+    function Retrieve(const FileName: string): boolean;
+    function Put(const FileName: string): boolean; virtual; // because of LCLsocket
 
-    function ModifyFileModifiedTime(const AFileName: string; YYYMMDDHHMMSS: string): Boolean; overload;
-    function ModifyFileModifiedTime(const AFileName: string; Year, Month, Day, Hour, Minute, Second: word): Boolean; overload;
-    function ModifyFileModifiedTime(const AFileName: string; AFileModifiedDateTime: TDateTime): Boolean; overload;
-   public
+    function ChangeDirectory(const DestPath: string): boolean;
+    function MakeDirectory(const DirName: string): boolean;
+    function RemoveDirectory(const DirName: string): boolean;
+
+    function DeleteFile(const FileName: string): boolean;
+    function Rename(const FromName, ToName: string): boolean;
+
+    function GetFileModifiedTime(const AFileName: string): boolean;
+
+    function ModifyFileModifiedTime(const AFileName: string;
+      YYYMMDDHHMMSS: string): boolean; overload;
+    function ModifyFileModifiedTime(const AFileName: string;
+      Year, Month, Day, Hour, Minute, Second: word): boolean; overload;
+    function ModifyFileModifiedTime(const AFileName: string;
+      AFileModifiedDateTime: TDateTime): boolean; overload;
+  public
     procedure List(const FileName: string = '');
     procedure Nlst(const FileName: string = '');
 
@@ -234,17 +244,17 @@ type
     // Kiewitz
     procedure Quit;
 
-    procedure Disconnect(const Forced: Boolean = False); override;
-    
+    procedure Disconnect(const Forced: boolean = False); override;
+
     procedure CallAction; override;
-   public
+  public
     property StatusSet: TLFTPStatusSet read FStatusSet write FStatusSet;
-    property ChunkSize: Word read FChunkSize write FChunkSize;
-    property Binary: Boolean read GetBinary write SetBinary;
-    property PipeLine: Boolean read FPipeLine write FPipeLine;
-    property Echo: Boolean read GetEcho write SetEcho;
-    property StartPort: Word read FStartPort write FStartPort default DEFAULT_FTP_PORT;
-    property Transfer: Boolean read GetTransfer;
+    property ChunkSize: word read FChunkSize write FChunkSize;
+    property Binary: boolean read GetBinary write SetBinary;
+    property PipeLine: boolean read FPipeLine write FPipeLine;
+    property Echo: boolean read GetEcho write SetEcho;
+    property StartPort: word read FStartPort write FStartPort default DEFAULT_FTP_PORT;
+    property Transfer: boolean read GetTransfer;
     property CurrentStatus: TLFTPStatus read GetCurrentStatus;
     property PresentWorkingDirectoryString: string read FPWD;
     property ParsedData: string read FParsedData;
@@ -258,26 +268,27 @@ type
     property OnSuccess: TLFTPClientStatusEvent read FOnSuccess write FOnSuccess;
     property OnFailure: TLFTPClientStatusEvent read FOnFailure write FOnFailure;
   end;
-  
-  function FTPStatusToStr(const aStatus: TLFTPStatus): string;
-  
+
+function FTPStatusToStr(const aStatus: TLFTPStatus): string;
+
 implementation
 
 uses
   SysUtils, Math;
 
 const
-  FLE             = #13#10;
+  FLE = #13#10;
 
   EMPTY_REC: TLFTPStatusRec = (Status: fsNone; Args: ('', ''));
 
-  FTPStatusStr: array[TLFTPStatus] of string = ('None', 'Connect', 'Authenticate', 'Password',
-                                                'Passive', 'Active', 'List', 'Retrieve',
-                                                'Store', 'Type', 'CWD', 'MKDIR',
-                                                'RMDIR', 'Delete', 'RenameFrom',
-                                                'RenameTo', 'System', 'Features',
-                                                'PWD', 'HELP', 'QUIT', 'LAST', 'MLSD',
-                                                'MLST', 'MFMT', 'MDTM');
+  FTPStatusStr: array[TLFTPStatus] of string =
+    ('None', 'Connect', 'Authenticate', 'Password',
+    'Passive', 'Active', 'List', 'Retrieve',
+    'Store', 'Type', 'CWD', 'MKDIR',
+    'RMDIR', 'Delete', 'RenameFrom',
+    'RenameTo', 'System', 'Features',
+    'PWD', 'HELP', 'QUIT', 'LAST', 'MLSD',
+    'MLST', 'MFMT', 'MDTM');
 
 procedure Writedbg(const ar: array of const);
 {$ifdef debug}
@@ -301,7 +312,8 @@ begin
 end;
 {$endif}
 
-function MakeStatusRec(const aStatus: TLFTPStatus; const Arg1, Arg2: string): TLFTPStatusRec;
+function MakeStatusRec(const aStatus: TLFTPStatus;
+  const Arg1, Arg2: string): TLFTPStatusRec;
 begin
   Result.Status := aStatus;
   Result.Args[1] := Arg1;
@@ -331,22 +343,22 @@ end;
 procedure TLFTP.SetCreator(AValue: TLComponent);
 begin
   inherited SetCreator(AValue);
-  
+
   FControl.Creator := AValue;
   FData.Creator := AValue;
 end;
 
-function TLFTP.GetConnected: Boolean;
+function TLFTP.GetConnected: boolean;
 begin
   Result := FControl.Connected;
 end;
 
-function TLFTP.GetTimeout: Integer;
+function TLFTP.GetTimeout: integer;
 begin
   Result := FControl.Timeout;
 end;
 
-procedure TLFTP.SetTimeout(const Value: Integer);
+procedure TLFTP.SetTimeout(const Value: integer);
 begin
   FControl.Timeout := Value;
   FData.Timeout := Value;
@@ -377,7 +389,7 @@ begin
   FData.Creator := Self;
   FData.SocketClass := TLSocket;
 
-  FTransferMethod  :=  ftPassive; // let's be modern
+  FTransferMethod := ftPassive; // let's be modern
 
   FFeatureList := TStringList.Create;
 end;
@@ -393,7 +405,7 @@ end;
 
 { TLFTPTelnetClient }
 
-procedure TLFTPTelnetClient.React(const Operation, Command: Char);
+procedure TLFTPTelnetClient.React(const Operation, Command: char);
 begin
   // don't do a FUCK since they broke Telnet in FTP as per-usual
 end;
@@ -427,7 +439,7 @@ begin
 
   FStatus := TLFTPStatusFront.Create(EMPTY_REC);
   FCommandFront := TLFTPStatusFront.Create(EMPTY_REC);
-  
+
   FStoreFile := nil;
 end;
 
@@ -472,12 +484,14 @@ procedure TLFTPClient.OnControlEr(const msg: string; aSocket: TLSocket);
 begin
   StopSending;
 
-  if Assigned(FOnFailure) then begin
+  if Assigned(FOnFailure) then
+  begin
     while not FStatus.Empty do
       FOnFailure(aSocket, FStatus.Remove.Status);
-  end else
+  end
+  else
     FStatus.Clear;
-    
+
   ClearStatusFlags;
 
   if Assigned(FOnError) then
@@ -525,37 +539,37 @@ begin
   Result := FStatus.First.Status;
 end;
 
-function TLFTPClient.GetTransfer: Boolean;
+function TLFTPClient.GetTransfer: boolean;
 begin
   Result := FData.Connected;
 end;
 
-function TLFTPClient.GetEcho: Boolean;
+function TLFTPClient.GetEcho: boolean;
 begin
   Result := FControl.OptionIsSet(TS_ECHO);
 end;
 
-function TLFTPClient.GetConnected: Boolean;
+function TLFTPClient.GetConnected: boolean;
 begin
   Result := FStatusFlags[fsCon] and inherited;
 end;
 
-function TLFTPClient.GetBinary: Boolean;
+function TLFTPClient.GetBinary: boolean;
 begin
   Result := FStatusFlags[fsType];
 end;
 
-function TLFTPClient.CanContinue(const aStatus: TLFTPStatus; const Arg1,
-  Arg2: string): Boolean;
+function TLFTPClient.CanContinue(const aStatus: TLFTPStatus;
+  const Arg1, Arg2: string): boolean;
 begin
   Result := FPipeLine or FStatus.Empty;
   if not Result then
     FCommandFront.Insert(MakeStatusRec(aStatus, Arg1, Arg2));
 end;
 
-function TLFTPClient.CleanInput(var s: string): Integer;
+function TLFTPClient.CleanInput(var s: string): integer;
 var
-  i: Integer;
+  i: integer;
 begin
   FSL.Text := s;
   for i := 0 to FSL.Count - 1 do
@@ -565,11 +579,11 @@ begin
   s := StringReplace(s, FLE, LineEnding, [rfReplaceAll]);
   i := Pos('PASS', s);
   if i > 0 then
-    s := Copy(s, 1, i-1) + 'PASS';
+    s := Copy(s, 1, i - 1) + 'PASS';
   Result := Length(s);
 end;
 
-procedure TLFTPClient.SetStartPor(const Value: Word);
+procedure TLFTPClient.SetStartPor(const Value: word);
 begin
   FStartPort := Value;
   if Value > FLastPort then
@@ -578,7 +592,7 @@ end;
 
 procedure TLFTPClient.EvaluateFeatures;
 var
-  i: Integer;
+  i: integer;
 begin
   FFeatureList.Clear;
   if Length(FFeatureString) = 0 then
@@ -589,9 +603,10 @@ begin
   FFeatureList.Delete(0);
 
   i := 0;
-  while i < FFeatureList.Count do begin
-    if (Length(Trim(FFeatureList[i])) = 0)
-    or (FFeatureList[i][1] <> ' ') then begin
+  while i < FFeatureList.Count do
+  begin
+    if (Length(Trim(FFeatureList[i])) = 0) or (FFeatureList[i][1] <> ' ') then
+    begin
       FFeatureList.Delete(i);
       Continue;
     end;
@@ -602,7 +617,7 @@ begin
   end;
 end;
 
-procedure TLFTPClient.SetEcho(const Value: Boolean);
+procedure TLFTPClient.SetEcho(const Value: boolean);
 begin
   if Value then
     FControl.SetOption(TS_ECHO)
@@ -612,12 +627,14 @@ end;
 
 procedure TLFTPClient.ParsePWD(const s: string);
 var
-  i: Integer;
-  IsIn: Boolean = False;
+  i: integer;
+  IsIn: boolean = False;
 begin
   FPWD := '';
-  for i := 1 to Length(s) do begin
-    if s[i] = '"' then begin
+  for i := 1 to Length(s) do
+  begin
+    if s[i] = '"' then
+    begin
       IsIn := not IsIn;
       Continue;
     end;
@@ -626,11 +643,12 @@ begin
   end;
 end;
 
-procedure TLFTPClient.SetBinary(const Value: Boolean);
+procedure TLFTPClient.SetBinary(const Value: boolean);
 const
-  TypeBool: array[Boolean] of string = ('A', 'I');
+  TypeBool: array[boolean] of string = ('A', 'I');
 begin
-  if CanContinue(fsType, BoolToStr(Value), '') then begin
+  if CanContinue(fsType, BoolToStr(Value), '') then
+  begin
     FExpectedBinary := Value;
     FStatus.Insert(MakeStatusRec(fsType, '', ''));
     FControl.SendMessage('TYPE ' + TypeBool[Value] + FLE);
@@ -639,31 +657,31 @@ end;
 
 procedure TLFTPClient.EvaluateAnswer(const Ans: string);
 
-  function GetNum: Integer;
+  function GetNum: integer;
   begin
     Result := -1;
-    if (Length(Ans) >= 3)
-    and (Ans[1] in ['0'..'9'])
-    and (Ans[2] in ['0'..'9'])
-    and (Ans[3] in ['0'..'9']) then
+    if (Length(Ans) >= 3) and (Ans[1] in ['0'..'9']) and
+      (Ans[2] in ['0'..'9']) and (Ans[3] in ['0'..'9']) then
       Result := StrToInt(Copy(Ans, 1, 3));
   end;
 
   procedure ParsePortIP(s: string);
   var
-    i, l: Integer;
+    i, l: integer;
     aIP: string;
-    aPort: Word;
+    aPort: word;
     sl: TStringList;
   begin
-    if Length(s) >= 15 then begin
+    if Length(s) >= 15 then
+    begin
       sl := TStringList.Create;
       for i := Length(s) downto 5 do
         if s[i] = ',' then Break;
       while (i <= Length(s)) and (s[i] in ['0'..'9', ',']) do Inc(i);
       if not (s[i] in ['0'..'9', ',']) then Dec(i);
       l := 0;
-      while s[i] in ['0'..'9', ','] do begin
+      while s[i] in ['0'..'9', ','] do
+      begin
         Inc(l);
         Dec(i);
       end;
@@ -677,7 +695,8 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
         aPort := 0;
       end;
       Writedbg(['Server PASV addr/port - ', aIP, ' : ', aPort]);
-      if (aPort > 0) and FData.Connect(aIP, aPort) then begin
+      if (aPort > 0) and FData.Connect(aIP, aPort) then
+      begin
         Writedbg(['Connected after PASV']);
         // Short delay for Windows CE, had aborted connection errors w/o it
         //Sleep(50);
@@ -686,339 +705,360 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
       FStatus.Remove;
     end;
   end;
-  
+
   procedure SendFile;
   begin
     FStoreFile.Position := 0;
     FSending := True;
     SendChunk(False);
   end;
-  
-  function ValidResponse(const Answer: string): Boolean; inline;
+
+  function ValidResponse(const Answer: string): boolean; inline;
   begin
-    Result := (Length(Ans) >= 3) and
-            (Ans[1] in ['1'..'5']) and
-            (Ans[2] in ['0'..'9']) and
-            (Ans[3] in ['0'..'9']);
-            
+    Result := (Length(Ans) >= 3) and (Ans[1] in ['1'..'5']) and
+      (Ans[2] in ['0'..'9']) and (Ans[3] in ['0'..'9']);
+
     if Result then
       Result := (Length(Ans) = 3) or ((Length(Ans) > 3) and (Ans[4] = ' '));
   end;
-  
-  procedure Eventize(const aStatus: TLFTPStatus; const Res: Boolean);
+
+  procedure Eventize(const aStatus: TLFTPStatus; const Res: boolean);
   begin
     FStatus.Remove;
-    if Res then begin
+    if Res then
+    begin
       if Assigned(FOnSuccess) and (aStatus in FStatusSet) then
         FOnSuccess(FData.Iterator, aStatus);
-    end else begin
+    end
+    else
+    begin
       if Assigned(FOnFailure) and (aStatus in FStatusSet) then
         FOnFailure(FData.Iterator, aStatus);
     end;
   end;
-  
+
 var
-  x: Integer;
+  x: integer;
 begin
   x := GetNum;
-  Writedbg(['WOULD EVAL: ', FTPStatusStr[FStatus.First.Status], ' with value: ',
-            x, ' from "', Ans, '"']);
+  Writedbg(['WOULD EVAL: ', FTPStatusStr[FStatus.First.Status],
+    ' with value: ', x, ' from "', Ans, '"']);
 
   case FStatus.First.Status of
-		fsFeat:
+    fsFeat:
+    begin
+      FFeatureString := FFeatureString + Ans + FLE; // we need to parse this later
+    end;
+    fsMlst:
+    begin
+      if x < 0 then
       begin
-				FFeatureString := FFeatureString + Ans + FLE; // we need to parse this later
-			end;
-		fsMlst:
-      begin
-        if x < 0 then begin
-          FParsedData := Ans;
-				end;
-			end;
-	end;
+        FParsedData := Ans;
+      end;
+    end;
+  end;
 
 
   if ValidResponse(Ans) then
-    if not FStatus.Empty then begin
+    if not FStatus.Empty then
+    begin
       Writedbg(['EVAL: ', FTPStatusStr[FStatus.First.Status], ' with value: ', x]);
       case FStatus.First.Status of
-        fsCon  : case x of
-                   220:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsCon: case x of
+            220:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsUser : case x of
-                   230:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   331,
-                   332:
-                     begin
-                       FStatus.Remove;
-                       Password(FPassword);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-                 
-        fsPass : case x of
-                   230:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsUser: case x of
+            230:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            331,
+            332:
+            begin
+              FStatus.Remove;
+              Password(FPassword);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsPasv : case x of
-                   227: ParsePortIP(Ans);
-                   300..600: FStatus.Remove;
-                 end;
+        fsPass: case x of
+            230:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsPort : case x of
-                   200:
-                     begin
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsPasv: case x of
+            227: ParsePortIP(Ans);
+            300..600: FStatus.Remove;
+          end;
 
-        fsType : case x of
-                   200:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := FExpectedBinary;
-                       Writedbg(['Binary mode: ', FExpectedBinary]);
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsPort: case x of
+            200:
+            begin
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsRetr : case x of
-                   125, 150: begin { Do nothing } end;
-                   226:
-                     begin
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FData.Disconnect(True);  // break on purpose, otherwise we get invalidated ugly
-                       Writedbg(['Disconnecting data connection']);
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsType: case x of
+            200:
+            begin
+              FStatusFlags[FStatus.First.Status] := FExpectedBinary;
+              Writedbg(['Binary mode: ', FExpectedBinary]);
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsStor : case x of
-                   125, 150: SendFile;
-                   
-                   226:
-                     begin
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsRetr: case x of
+            125, 150: begin { Do nothing }
+            end;
+            226:
+            begin
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FData.Disconnect(True);
+              // break on purpose, otherwise we get invalidated ugly
+              Writedbg(['Disconnecting data connection']);
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsCWD  : case x of
-                   200, 250:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsStor: case x of
+            125, 150:
+            begin
+              // Only start sending if we still have a valid file stream
+              if Assigned(FStoreFile) then
+                SendFile
+              else
+              begin
+                Writedbg(
+                  ['fsStor: got 125/150 but FStoreFile=nil, marking STOR as failed']);
+                Eventize(FStatus.First.Status, False);
+              end;
+            end;
 
-        fsPWD  : case x of
-                   257:
-                     begin
-                       ParsePWD(Ans);
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+            226:
+            begin
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsHelp  : case x of
-                   211, 214:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsCWD: case x of
+            200, 250:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsList : case x of
-                   125, 150: begin { do nothing } end;
-                   226:
-                     begin
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-                 
-        fsMKD  : case x of
-                   250, 257:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-                 
+        fsPWD: case x of
+            257:
+            begin
+              ParsePWD(Ans);
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+
+        fsHelp: case x of
+            211, 214:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+
+        fsList: case x of
+            125, 150: begin { do nothing }
+            end;
+            226:
+            begin
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+
+        fsMKD: case x of
+            250, 257:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+
         fsRMD,
-        fsDEL  : case x of
-                   250:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FStatusFlags[FStatus.First.Status] := False;
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-                 
-        fsRNFR : case x of
-                   350:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-                 
-        fsRNTO : case x of
-                   250:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-        fsFeat : case x of
-                   200..299:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       EvaluateFeatures;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       FFeatureString := '';
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-        fsQUIT : case x of
-                   221:
-                     begin
-                       FStatusFlags[FStatus.First.Status] := True;
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsDEL: case x of
+            250:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FStatusFlags[FStatus.First.Status] := False;
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsMlsd : case x of
-                   125, 150: begin { do nothing } end;
-                   226:
-                     begin
-                       Eventize(FStatus.First.Status, True);
-										 end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-        fsMlst : case x of
-                   -1, 125, 150: begin { do nothing } end;
-                   250:
-                     begin
-                       if Ans[4] = '-' then begin
-                         FParsedData := '';
-											 end;
-                       if Ans[4] = ' ' then begin
-                         Eventize(FStatus.First.Status, True);
-											 end;
-										 end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
-        fsMfmt : case x of
-                   213, 253:
-                     begin
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsRNFR: case x of
+            350:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
-        fsMdtm : case x of
-                   213:
-                     begin
-                       FParsedData:=copy(Ans, 5, length(Ans) - 4);
-                       Eventize(FStatus.First.Status, True);
-                     end;
-                   else
-                     begin
-                       Eventize(FStatus.First.Status, False);
-                     end;
-                 end;
+        fsRNTO: case x of
+            250:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+        fsFeat: case x of
+            200..299:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              EvaluateFeatures;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              FFeatureString := '';
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+        fsQUIT: case x of
+            221:
+            begin
+              FStatusFlags[FStatus.First.Status] := True;
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+
+        fsMlsd: case x of
+            125, 150: begin { do nothing }
+            end;
+            226:
+            begin
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+        fsMlst: case x of
+            -1, 125, 150: begin { do nothing }
+            end;
+            250:
+            begin
+              if Ans[4] = '-' then
+              begin
+                FParsedData := '';
+              end;
+              if Ans[4] = ' ' then
+              begin
+                Eventize(FStatus.First.Status, True);
+              end;
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+        fsMfmt: case x of
+            213, 253:
+            begin
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
+
+        fsMdtm: case x of
+            213:
+            begin
+              FParsedData := copy(Ans, 5, length(Ans) - 4);
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
       end;
     end;
@@ -1028,20 +1068,21 @@ end;
 
 procedure TLFTPClient.PasvPort;
 
-  function StringPair(const aPort: Word): string;
+  function StringPair(const aPort: word): string;
   begin
     Result := IntToStr(aPort div 256);
     Result := Result + ',' + IntToStr(aPort mod 256);
   end;
-  
+
   function StringIP: string;
   begin
-    Result := StringReplace(FControl.Connection.Iterator.LocalAddress, '.', ',',
-                          [rfReplaceAll]) + ',';
+    Result := StringReplace(FControl.Connection.Iterator.LocalAddress,
+      '.', ',', [rfReplaceAll]) + ',';
   end;
-  
+
 begin
-  if FTransferMethod = ftActive then begin
+  if FTransferMethod = ftActive then
+  begin
     Writedbg(['Sent PORT']);
     FData.Disconnect(True);
     FData.Listen(FLastPort);
@@ -1052,48 +1093,73 @@ begin
       Inc(FLastPort)
     else
       FLastPort := FStartPort;
-  end else begin
+  end
+  else
+  begin
     Writedbg(['Sent PASV']);
     FStatus.Insert(MakeStatusRec(fsPasv, '', ''));
     FControl.SendMessage('PASV' + FLE);
   end;
 end;
 
-function TLFTPClient.User(const aUserName: string): Boolean;
+function TLFTPClient.User(const aUserName: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsUser, aUserName, '') then begin
+  if CanContinue(fsUser, aUserName, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsUser, '', ''));
     FControl.SendMessage('USER ' + aUserName + FLE);
     Result := True;
   end;
 end;
 
-function TLFTPClient.Password(const aPassword: string): Boolean;
+function TLFTPClient.Password(const aPassword: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsPass, aPassword, '') then begin
+  if CanContinue(fsPass, aPassword, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsPass, '', ''));
     FControl.SendMessage('PASS ' + aPassword + FLE);
     Result := True;
   end;
 end;
 
-procedure TLFTPClient.SendChunk(const Event: Boolean);
+procedure TLFTPClient.SendChunk(const Event: boolean);
 var
-  Buf: array[0..65535] of Byte;
-  n: Integer;
-  Sent: Integer;
+  Buf: array[0..65535] of byte;
+  n: integer;
+  Sent: integer;
 begin
+  // Nothing to do if we don't have a file anymore
+  if not Assigned(FStoreFile) then
+    Exit;
+
   repeat
+    // In case StopSending was called between iterations
+    if (not Assigned(FStoreFile)) or (not FSending) then
+      Exit;
+
     n := FStoreFile.Read(Buf, FChunkSize);
-    if n > 0 then begin
+    if n > 0 then
+    begin
       Sent := FData.Send(Buf, n);
+
+      // FData.Send may synchronously trigger OnEr/OnDs → StopSending
+      if (not Assigned(FStoreFile)) or (not FSending) then
+        Exit;
+
       if Event and Assigned(FOnSent) and (Sent > 0) then
         FOnSent(FData.Iterator, Sent);
+
+      // User's OnSent handler could also call StopSending
+      if (not Assigned(FStoreFile)) or (not FSending) then
+        Exit;
+
       if Sent < n then
-        FStoreFile.Position := FStoreFile.Position - (n - Sent); // so it's tried next time
-    end else begin
+        FStoreFile.Position := FStoreFile.Position - (n - Sent);
+    end
+    else
+    begin
       if Assigned(FOnSent) then
         FOnSent(FData.Iterator, 0);
       StopSending;
@@ -1106,36 +1172,37 @@ procedure TLFTPClient.ExecuteFrontCommand;
 begin
   with FCommandFront.First do
     case Status of
-      fsNone : Exit;
-      fsUser : User(Args[1]);
-      fsPass : Password(Args[1]);
-      fsList : List(Args[1]);
-      fsRetr : Retrieve(Args[1]);
-      fsStor : Put(Args[1]);
-      fsCWD  : ChangeDirectory(Args[1]);
-      fsMKD  : MakeDirectory(Args[1]);
-      fsRMD  : RemoveDirectory(Args[1]);
-      fsDEL  : DeleteFile(Args[1]);
-      fsRNFR : Rename(Args[1], Args[2]);
-      fsSYS  : SystemInfo;
-      fsPWD  : PresentWorkingDirectory;
-      fsHelp : Help(Args[1]);
-      fsType : SetBinary(StrToBool(Args[1]));
-      fsFeat : ListFeatures;
-      fsMlsd : Mlsd(Args[1]);
-      fsMlst : Mlst(Args[1]);
-      fsMdtm : GetFileModifiedTime(Args[1]);
+      fsNone: Exit;
+      fsUser: User(Args[1]);
+      fsPass: Password(Args[1]);
+      fsList: List(Args[1]);
+      fsRetr: Retrieve(Args[1]);
+      fsStor: Put(Args[1]);
+      fsCWD: ChangeDirectory(Args[1]);
+      fsMKD: MakeDirectory(Args[1]);
+      fsRMD: RemoveDirectory(Args[1]);
+      fsDEL: DeleteFile(Args[1]);
+      fsRNFR: Rename(Args[1], Args[2]);
+      fsSYS: SystemInfo;
+      fsPWD: PresentWorkingDirectory;
+      fsHelp: Help(Args[1]);
+      fsType: SetBinary(StrToBool(Args[1]));
+      fsFeat: ListFeatures;
+      fsMlsd: Mlsd(Args[1]);
+      fsMlst: Mlst(Args[1]);
+      fsMdtm: GetFileModifiedTime(Args[1]);
     end;
   FCommandFront.Remove;
 end;
 
-function TLFTPClient.Get(out aData; const aSize: Integer; aSocket: TLSocket): Integer;
+function TLFTPClient.Get(out aData; const aSize: integer; aSocket: TLSocket): integer;
 var
   s: string;
 begin
   Result := 0;
 
-  if FControl.Get(aData, aSize, aSocket) > 0 then begin
+  if FControl.Get(aData, aSize, aSocket) > 0 then
+  begin
     SetLength(s, Result);
     Move(aData, PChar(s)^, Result);
     Result := CleanInput(s);
@@ -1143,26 +1210,25 @@ begin
   end;
 end;
 
-function TLFTPClient.GetMessage(out msg: string; aSocket: TLSocket): Integer;
+function TLFTPClient.GetMessage(out msg: string; aSocket: TLSocket): integer;
 begin
   Result := FControl.GetMessage(msg, aSocket);
   if Result > 0 then
     Result := CleanInput(msg);
 end;
 
-function TLFTPClient.Send(const aData; const aSize: Integer; aSocket: TLSocket
-  ): Integer;
+function TLFTPClient.Send(const aData; const aSize: integer;
+  aSocket: TLSocket): integer;
 begin
   Result := FControl.Send(aData, aSize);
 end;
 
-function TLFTPClient.SendMessage(const msg: string; aSocket: TLSocket
-  ): Integer;
+function TLFTPClient.SendMessage(const msg: string; aSocket: TLSocket): integer;
 begin
   Result := FControl.SendMessage(msg);
 end;
 
-function TLFTPClient.GetData(out aData; const aSize: Integer): Integer;
+function TLFTPClient.GetData(out aData; const aSize: integer): integer;
 begin
   Result := FData.Iterator.Get(aData, aSize);
 end;
@@ -1174,11 +1240,12 @@ begin
     FData.Iterator.GetMessage(Result);
 end;
 
-function TLFTPClient.Connect(const aHost: string; const aPort: Word): Boolean;
+function TLFTPClient.Connect(const aHost: string; const aPort: word): boolean;
 begin
   Result := False;
   Disconnect(True);
-  if FControl.Connect(aHost, aPort) then begin
+  if FControl.Connect(aHost, aPort) then
+  begin
     FHost := aHost;
     FPort := aPort;
     FStatus.Insert(MakeStatusRec(fsCon, '', ''));
@@ -1188,21 +1255,22 @@ begin
     FData.Eventer := FControl.Connection.Eventer;
 end;
 
-function TLFTPClient.Connect: Boolean;
+function TLFTPClient.Connect: boolean;
 begin
   Result := Connect(FHost, FPort);
 end;
 
-function TLFTPClient.Authenticate(const aUsername, aPassword: string): Boolean;
+function TLFTPClient.Authenticate(const aUsername, aPassword: string): boolean;
 begin
   FPassword := aPassWord;
   Result := User(aUserName);
 end;
 
-function TLFTPClient.Retrieve(const FileName: string): Boolean;
+function TLFTPClient.Retrieve(const FileName: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsRetr, FileName, '') then begin
+  if CanContinue(fsRetr, FileName, '') then
+  begin
     PasvPort;
     FStatus.Insert(MakeStatusRec(fsRetr, '', ''));
     FControl.SendMessage('RETR ' + FileName + FLE);
@@ -1210,10 +1278,11 @@ begin
   end;
 end;
 
-function TLFTPClient.Put(const FileName: string): Boolean;
+function TLFTPClient.Put(const FileName: string): boolean;
 begin
   Result := not FPipeLine;
-  if FileExists(FileName) and CanContinue(fsStor, FileName, '') then begin
+  if FileExists(FileName) and CanContinue(fsStor, FileName, '') then
+  begin
     FStoreFile := TFileStream.Create(FileName, fmOpenRead);
     PasvPort;
     FStatus.Insert(MakeStatusRec(fsStor, '', ''));
@@ -1222,10 +1291,11 @@ begin
   end;
 end;
 
-function TLFTPClient.ChangeDirectory(const DestPath: string): Boolean;
+function TLFTPClient.ChangeDirectory(const DestPath: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsCWD, DestPath, '') then begin
+  if CanContinue(fsCWD, DestPath, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsCWD, '', ''));
     FStatusFlags[fsCWD] := False;
     FControl.SendMessage('CWD ' + DestPath + FLE);
@@ -1233,10 +1303,11 @@ begin
   end;
 end;
 
-function TLFTPClient.MakeDirectory(const DirName: string): Boolean;
+function TLFTPClient.MakeDirectory(const DirName: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsMKD, DirName, '') then begin
+  if CanContinue(fsMKD, DirName, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsMKD, '', ''));
     FStatusFlags[fsMKD] := False;
     FControl.SendMessage('MKD ' + DirName + FLE);
@@ -1244,10 +1315,11 @@ begin
   end;
 end;
 
-function TLFTPClient.RemoveDirectory(const DirName: string): Boolean;
+function TLFTPClient.RemoveDirectory(const DirName: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsRMD, DirName, '') then begin
+  if CanContinue(fsRMD, DirName, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsRMD, '', ''));
     FStatusFlags[fsRMD] := False;
     FControl.SendMessage('RMD ' + DirName + FLE);
@@ -1255,20 +1327,22 @@ begin
   end;
 end;
 
-function TLFTPClient.DeleteFile(const FileName: string): Boolean;
+function TLFTPClient.DeleteFile(const FileName: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsDEL, FileName, '') then begin
+  if CanContinue(fsDEL, FileName, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsDEL, '', ''));
     FControl.SendMessage('DELE ' + FileName + FLE);
     Result := True;
   end;
 end;
 
-function TLFTPClient.Rename(const FromName, ToName: string): Boolean;
+function TLFTPClient.Rename(const FromName, ToName: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsRNFR, FromName, ToName) then begin
+  if CanContinue(fsRNFR, FromName, ToName) then
+  begin
     FStatus.Insert(MakeStatusRec(fsRNFR, '', ''));
     FStatusFlags[fsRNFR] := False;
     FControl.SendMessage('RNFR ' + FromName + FLE);
@@ -1281,10 +1355,11 @@ begin
   end;
 end;
 
-function TLFTPClient.GetFileModifiedTime(const AFileName: string): Boolean;
+function TLFTPClient.GetFileModifiedTime(const AFileName: string): boolean;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsMdtm, AFileName, '') and (FFeatureList.IndexOf('MDTM') >= 0) then begin
+  if CanContinue(fsMdtm, AFileName, '') and (FFeatureList.IndexOf('MDTM') >= 0) then
+  begin
     FStatus.Insert(MakeStatusRec(fsMdtm, '', ''));
     FStatusFlags[fsMdtm] := False;
     FControl.SendMessage('MDTM ' + AFileName + FLE);
@@ -1292,10 +1367,13 @@ begin
   end;
 end;
 
-function TLFTPClient.ModifyFileModifiedTime(const AFileName: string; YYYMMDDHHMMSS: string): Boolean; overload;
+function TLFTPClient.ModifyFileModifiedTime(const AFileName: string;
+  YYYMMDDHHMMSS: string): boolean; overload;
 begin
   Result := not FPipeLine;
-  if CanContinue(fsMfmt, AFileName, YYYMMDDHHMMSS) and (FFeatureList.IndexOf('MFMT') >= 0) then begin
+  if CanContinue(fsMfmt, AFileName, YYYMMDDHHMMSS) and
+    (FFeatureList.IndexOf('MFMT') >= 0) then
+  begin
     FStatus.Insert(MakeStatusRec(fsMfmt, '', ''));
     FControl.SendMessage('MFMT ' + YYYMMDDHHMMSS + ' ' + AFileName + FLE);
     Result := True;
@@ -1303,27 +1381,31 @@ begin
 end;
 
 
-function TLFTPClient.ModifyFileModifiedTime(const AFileName: string; Year, Month, Day, Hour, Minute, Second: word): Boolean;
+function TLFTPClient.ModifyFileModifiedTime(const AFileName: string;
+  Year, Month, Day, Hour, Minute, Second: word): boolean;
 var
   sDateTime: string;
 begin
   Result := not FPipeLine;
-	sDateTime := Format('%.4d%.2d%.2d%.2d%.2d%.2d', [Year, Month, Day, Hour, Minute, Second]);
+  sDateTime := Format('%.4d%.2d%.2d%.2d%.2d%.2d', [Year, Month, Day,
+    Hour, Minute, Second]);
   Result := ModifyFileModifiedTime(AFileName, sDateTime);
 end;
 
-function TLFTPClient.ModifyFileModifiedTime(const AFileName: string; AFileModifiedDateTime: TDateTime): Boolean;
+function TLFTPClient.ModifyFileModifiedTime(const AFileName: string;
+  AFileModifiedDateTime: TDateTime): boolean;
 var
   Year, Month, Day, Hour, Minute, Second, MilliSecond: word;
 begin
   DecodeDate(AFileModifiedDateTime, Year, Month, Day);
   DecodeTime(AFileModifiedDateTime, Hour, Minute, Second, MilliSecond);
-	Result := ModifyFileModifiedTime(AFileName, Year, Month, Day, Hour, Minute, Second);
+  Result := ModifyFileModifiedTime(AFileName, Year, Month, Day, Hour, Minute, Second);
 end;
 
 procedure TLFTPClient.List(const FileName: string = '');
 begin
-  if CanContinue(fsList, FileName, '') then begin
+  if CanContinue(fsList, FileName, '') then
+  begin
     PasvPort;
     FStatus.Insert(MakeStatusRec(fsList, '', ''));
     if Length(FileName) > 0 then
@@ -1335,7 +1417,8 @@ end;
 
 procedure TLFTPClient.Nlst(const FileName: string);
 begin
-  if CanContinue(fsList, FileName, '') then begin
+  if CanContinue(fsList, FileName, '') then
+  begin
     PasvPort;
     FStatus.Insert(MakeStatusRec(fsList, '', ''));
     if Length(FileName) > 0 then
@@ -1347,7 +1430,8 @@ end;
 
 procedure TLFTPClient.Mlsd(const FileName: string = '');
 begin
-  if CanContinue(fsMlsd, FileName, '') then begin
+  if CanContinue(fsMlsd, FileName, '') then
+  begin
     PasvPort;
     FStatus.Insert(MakeStatusRec(fsMlsd, '', ''));
     if Length(FileName) > 0 then
@@ -1359,7 +1443,8 @@ end;
 
 procedure TLFTPClient.Mlst(const FileName: string = '');
 begin
-  if CanContinue(fsMlst, FileName, '') then begin
+  if CanContinue(fsMlst, FileName, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsMlst, '', ''));
     FStatusFlags[fsMlst] := False;
     FControl.SendMessage('MLST ' + FileName + FLE);
@@ -1374,7 +1459,8 @@ end;
 
 procedure TLFTPClient.ListFeatures;
 begin
-  if CanContinue(fsFeat, '', '') then begin
+  if CanContinue(fsFeat, '', '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsFeat, '', ''));
     FControl.SendMessage('FEAT' + FLE);
   end;
@@ -1382,7 +1468,8 @@ end;
 
 procedure TLFTPClient.PresentWorkingDirectory;
 begin
-  if CanContinue(fsPWD, '', '') then begin
+  if CanContinue(fsPWD, '', '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsPWD, '', ''));
     FControl.SendMessage('PWD' + FLE);
   end;
@@ -1390,7 +1477,8 @@ end;
 
 procedure TLFTPClient.Help(const Arg: string);
 begin
-  if CanContinue(fsHelp, Arg, '') then begin
+  if CanContinue(fsHelp, Arg, '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsHelp, Arg, ''));
     FControl.SendMessage('HELP ' + Arg + FLE);
   end;
@@ -1398,13 +1486,14 @@ end;
 
 procedure TLFTPClient.Quit;
 begin
-  if CanContinue(fsQuit, '', '') then begin
+  if CanContinue(fsQuit, '', '') then
+  begin
     FStatus.Insert(MakeStatusRec(fsQuit, '', ''));
     FControl.SendMessage('QUIT' + FLE);
   end;
 end;
 
-procedure TLFTPClient.Disconnect(const Forced: Boolean = False);
+procedure TLFTPClient.Disconnect(const Forced: boolean = False);
 begin
   FControl.Disconnect(Forced);
   FStatus.Clear;
@@ -1423,4 +1512,3 @@ initialization
   Randomize;
 
 end.
-
