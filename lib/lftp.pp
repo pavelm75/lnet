@@ -27,7 +27,7 @@ unit lFTP;
 {$mode objfpc}{$H+}
 {$inline on}
 {$macro on}
-//{$define debug}
+{$define debug}
 
 interface
 
@@ -271,6 +271,17 @@ type
 
 function FTPStatusToStr(const aStatus: TLFTPStatus): string;
 
+{$ifdef debug}
+
+type
+  TDebugLogProc = procedure(msg: string) of object;
+
+const
+  LNetDebugLogProc: TDebugLogProc = nil;
+
+  {$endif}
+
+
 implementation
 
 uses
@@ -293,19 +304,38 @@ const
 procedure Writedbg(const ar: array of const);
 {$ifdef debug}
 var
-  i: Integer;
+  i: integer;
+  s: string;
 begin
-  if High(ar) >= 0 then
-    for i := 0 to High(ar) do
-      case ar[i].vtype of
-        vtInteger: Write(ar[i].vinteger);
-        vtString: Write(ar[i].vstring^);
-        vtAnsiString: Write(AnsiString(ar[i].vpointer));
-        vtBoolean: Write(ar[i].vboolean);
-        vtChar: Write(ar[i].vchar);
-        vtExtended: Write(Extended(ar[i].vpointer^));
-      end;
-  Writeln;
+  if assigned(LNetDebugLogProc) then
+  begin
+    s := 'lFTP.Writedbg: ';
+    if High(ar) >= 0 then
+      for i := 0 to High(ar) do
+        case ar[i].vtype of
+          vtInteger: s := Format('%s%d', [s, ar[i].vinteger]);
+          vtString: s := Format('%s%s', [s, ar[i].vstring^]);
+          vtAnsiString: s := Format('%s%s', [s, ansistring(ar[i].vpointer)]);
+          vtBoolean: s := Format('%s%d', [s, ord(ar[i].vboolean)]);
+          vtChar: s := Format('%s%s', [s, ar[i].vchar]);
+          vtExtended: s := Format('%s%x', [s, Int64(ar[i].vpointer)]);
+        end;
+		LNetDebugLogProc(s);
+  end
+  else
+  begin
+    if High(ar) >= 0 then
+      for i := 0 to High(ar) do
+        case ar[i].vtype of
+          vtInteger: Write(ar[i].vinteger);
+          vtString: Write(ar[i].vstring^);
+          vtAnsiString: Write(ansistring(ar[i].vpointer));
+          vtBoolean: Write(ar[i].vboolean);
+          vtChar: Write(ar[i].vchar);
+          vtExtended: Write(extended(ar[i].vpointer^));
+        end;
+    Writeln;
+  end;
 end;
 {$else}
 begin
@@ -665,6 +695,7 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
       Result := StrToInt(Copy(Ans, 1, 3));
   end;
 
+  (*
   procedure ParsePortIP(s: string);
   var
     i, l: integer;
@@ -705,6 +736,67 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
       FStatus.Remove;
     end;
   end;
+  *)
+
+  procedure ParsePortIP(s: string);
+  var
+    i, startParen, endParen: integer;
+    inner: string;
+    sl: TStringList;
+    aIP: string;
+    aPort: word;
+  begin
+    // Find '('
+    startParen := Pos('(', s);
+    if startParen = 0 then
+      Exit; // malformed reply
+
+    // Find last ')', scanning from the end (manual RPos for one char)
+    endParen := 0;
+    for i := Length(s) downto startParen + 1 do
+      if s[i] = ')' then
+      begin
+        endParen := i;
+        Break;
+      end;
+
+    if (endParen = 0) or (endParen <= startParen + 1) then
+      Exit; // malformed reply
+
+    // Extract the stuff inside parentheses: "h1,h2,h3,h4,p1,p2"
+    inner := Copy(s, startParen + 1, endParen - startParen - 1);
+
+    sl := TStringList.Create;
+    try
+      sl.StrictDelimiter := True;
+      sl.Delimiter := ',';      // we only want to split on commas
+      sl.DelimitedText := inner;
+
+      if sl.Count < 6 then
+        Exit; // not enough parts
+
+      aIP :=
+        sl[0] + '.' + sl[1] + '.' + sl[2] + '.' + sl[3];
+
+      // Use StrToIntDef just in case
+      aPort :=
+        word(StrToIntDef(sl[4], 0) * 256 + StrToIntDef(sl[5], 0));
+
+      Writedbg(['PASV raw response = "', s, '"']);
+      Writedbg(['Server PASV addr/port - ', aIP, ' : ', aPort]);
+
+      if (aPort > 0) and FData.Connect(aIP, aPort) then
+      begin
+        Writedbg(['Connected after PASV']);
+        Sleep(50); // if you ever need this for CE again
+      end;
+
+      FStatus.Remove;
+    finally
+      sl.Free;
+    end;
+  end;
+
 
   procedure SendFile;
   begin

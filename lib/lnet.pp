@@ -732,7 +732,7 @@ begin
     if fpsetsockopt(FHandle, SOL_SOCKET, SO_NOSIGPIPE, @Arg, Sizeof(Arg)) = SOCKET_ERROR then
       Exit(Bail('SetSockOpt error', LSocketError));
     {$endif}
-    
+
     FillAddressInfo(FAddress, FSocketNet, Address, aPort);
     FillAddressInfo(FPeerAddress, FSocketNet, LADDR_BR, aPort);
 
@@ -867,6 +867,8 @@ begin
     Bail('Error on accept', LSocketError);
 end;
 
+//--- Revised 2025-11-20 (c) Pavel Mokrý --------------------------------------v
+(*
 function TLSocket.Connect(const Address: string; const aPort: Word): Boolean;
 begin
   Result := False;
@@ -880,6 +882,45 @@ begin
     Result := True;
   end;
 end;
+*)
+
+function TLSocket.Connect(const Address: string; const aPort: Word): Boolean;
+var
+  res : Longint;
+  err : Longint;
+begin
+  Result := False;
+
+  if FConnectionStatus <> scNone then
+    Disconnect(True);
+
+  if SetupSocket(APort, Address) then
+  begin
+    res := fpConnect(FHandle, GetIPAddressPointer, GetIPAddressLength);
+    if res = 0 then
+    begin
+      // Connected immediately (e.g. localhost in blocking mode)
+      FConnectionStatus := scConnected;
+      Result := True;
+    end
+    else
+    begin
+      err := LSocketError;
+      if IsBlockError(err) then
+      begin
+        // Non-blocking connect in progress
+        FConnectionStatus := scConnecting;
+        Result := True;
+      end
+      else
+      begin
+        Bail('Error on connect', err);
+        Result := False;
+      end;
+    end;
+  end;
+end;
+//--- Revised 2025-11-20 (c) Pavel Mokrý --------------------------------------^
 
 function TLSocket.SendMessage(const msg: string): Integer;
 begin
@@ -1499,6 +1540,8 @@ begin
     FEventer.CallAction;
 end;
 
+//--- Revised 2025-11-20 (c) Pavel Mokrý --------------------------------------v
+(*
 procedure TLTcp.ConnectAction(aSocket: TLHandle);
 var
   addr4: TInetSockAddr;
@@ -1530,6 +1573,43 @@ begin
     end;
   end;
 end;
+*)
+
+procedure TLTcp.ConnectAction(aSocket: TLHandle);
+var
+  s   : TLSocket;
+  err : Longint;
+  len : TSockLen;
+begin
+  s := TLSocket(aSocket);
+
+  err := 0;
+  len := SizeOf(err);
+
+  if Sockets.fpGetSockOpt(s.FHandle, SOL_SOCKET, SO_ERROR, @err, @len) <> 0 then
+  begin
+    // Could not obtain connect result – treat as a hard error
+    Self.Bail('Error on connect: ' + LStrError(LSocketError), s);
+    Exit;
+  end;
+
+  if err <> 0 then
+  begin
+    // Real failure of the non-blocking connect
+    Self.Bail('Error on connect: ' + LStrError(err), s);
+    Exit;
+  end;
+
+  // Success: mark as connected and notify the user/session
+  s.FConnectionStatus := scConnected;
+  s.IgnoreWrite := True;
+
+  if Assigned(FSession) then
+    FSession.ConnectEvent(aSocket)
+  else
+    ConnectEvent(aSocket);
+end;
+//--- Revised 2025-11-20 (c) Pavel Mokrý --------------------------------------^
 
 procedure TLTcp.AcceptAction(aSocket: TLHandle);
 var
@@ -1594,6 +1674,8 @@ begin
   end;
 end;
 
+//--- Revised 2025-11-20 (c) Pavel Mokrý --------------------------------------v
+(*
 procedure TLTcp.ErrorAction(aSocket: TLHandle; const msg: string);
 begin
   if TLSocket(aSocket).ConnectionStatus = scConnecting then begin
@@ -1606,6 +1688,53 @@ begin
   else
     ErrorEvent(aSocket, msg);
 end;
+*)
+
+procedure TLTcp.ErrorAction(aSocket: TLHandle; const msg: string);
+var
+  s   : TLSocket;
+  err : Longint;
+  len : TSockLen;
+begin
+  s := TLSocket(aSocket);
+
+  // Special handling while a non-blocking connect is still in progress
+  if s.ConnectionStatus = scConnecting then
+  begin
+    err := 0;
+    len := SizeOf(err);
+
+    // Ask the kernel for the real connect result
+    if Sockets.fpGetSockOpt(s.FHandle, SOL_SOCKET, SO_ERROR, @err, @len) = 0 then
+    begin
+      if err = 0 then
+      begin
+        // No real error – spurious "error" notification from the eventer.
+        // Just ignore it and let SendAction/ConnectAction finish the handshake.
+        Exit;
+      end;
+
+      // Real error from the OS – connection failed.
+      Self.Bail('Error on connect: ' + LStrError(err), s);
+      Exit;
+    end
+    else
+    begin
+      // getsockopt itself failed – we fall back to the message from the eventer.
+      Self.Bail('Error on connect: ' + msg, s);
+      Exit;
+    end;
+  end;
+
+  // For already connected sockets, forward the error to the user/session
+  // but *do not* automatically treat it as a connect failure.
+  if Assigned(FSession) then
+    FSession.ErrorEvent(aSocket, msg)
+  else
+    ErrorEvent(aSocket, msg);
+end;
+
+//--- Revised 2025-11-20 (c) Pavel Mokrý --------------------------------------^
 
 function TLTcp.GetConnected: Boolean;
 var
