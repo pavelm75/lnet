@@ -314,15 +314,15 @@ begin
     if High(ar) >= 0 then
       for i := 0 to High(ar) do
         case ar[i].vtype of
-          vtInteger:   s := Format('%s%d', [s, ar[i].vinteger]);
-          vtInt64:     s := Format('%s%d', [s, ar[i].vInt64^]);
-          vtString:    s := Format('%s%s', [s, ar[i].vstring^]);
-          vtAnsiString:s := Format('%s%s', [s, ansistring(ar[i].vpointer)]);
-          vtBoolean:   s := Format('%s%d', [s, ord(ar[i].vboolean)]);
-          vtChar:      s := Format('%s%s', [s, ar[i].vchar]);
-          vtExtended:  s := Format('%s%x', [s, Int64(ar[i].vpointer)]);
+          vtInteger: s := Format('%s%d', [s, ar[i].vinteger]);
+          vtInt64: s := Format('%s%d', [s, ar[i].vInt64^]);
+          vtString: s := Format('%s%s', [s, ar[i].vstring^]);
+          vtAnsiString: s := Format('%s%s', [s, ansistring(ar[i].vpointer)]);
+          vtBoolean: s := Format('%s%d', [s, Ord(ar[i].vboolean)]);
+          vtChar: s := Format('%s%s', [s, ar[i].vchar]);
+          vtExtended: s := Format('%s%x', [s, int64(ar[i].vpointer)]);
         end;
-		LNetDebugLogProc(s);
+    LNetDebugLogProc(s);
   end
   else
   begin
@@ -459,7 +459,7 @@ begin
   FData.OnDisconnect := @OnDs;
   FData.OnCanSend := @OnSe;
   FData.OnError := @OnEr;
-  FData.OnConnect   := @OnDataConnect;
+  FData.OnConnect := @OnDataConnect;
 
   FStatusSet := [fsNone..fsLast]; // full Event set
   FPassWord := '';
@@ -555,10 +555,10 @@ end;
 
 procedure TLFTPClient.OnDataConnect(aSocket: TLSocket);
 begin
-  Writedbg(['OnCo(Data): Connected=', FData.Connected,
-            ', Local=', FData.Iterator.LocalAddress, ':', FData.Iterator.LocalPort,
-            ', Remote=', FData.Iterator.PeerAddress, ':', FData.Iterator.PeerPort,
-            ', FSending=', FSending]);
+  Writedbg(['OnCo(Data): Connected=', FData.Connected, ', Local=',
+    FData.Iterator.LocalAddress, ':', FData.Iterator.LocalPort,
+    ', Remote=', FData.Iterator.PeerAddress, ':', FData.Iterator.PeerPort,
+    ', FSending=', FSending]);
 
   // If an upload is pending, kick off sending now
   if FSending and Assigned(FStoreFile) then
@@ -804,12 +804,10 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
 
       if (aPort > 0) and FData.Connect(aIP, aPort) then
       begin
-        Writedbg(['Connected after PASV',
-                  ', Data.Connected=', FData.Connected,
-                  ', Local=', FData.Iterator.LocalAddress,
-                  ':', FData.Iterator.LocalPort,
-                  ', Remote=', FData.Iterator.PeerAddress,
-                  ':', FData.Iterator.PeerPort]);
+        Writedbg(['Connected after PASV', ', Data.Connected=',
+          FData.Connected, ', Local=', FData.Iterator.LocalAddress,
+          ':', FData.Iterator.LocalPort, ', Remote=',
+          FData.Iterator.PeerAddress, ':', FData.Iterator.PeerPort]);
         // Sleep(50);
       end
       else
@@ -843,9 +841,8 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
     FSending := True;
 
     Writedbg(['SendFile: starting upload of "', FStatus.First.Args[1],
-              '", size=', FStoreFile.Size,
-              ', ChunkSize=', FChunkSize,
-              ', Data.Connected=', FData.Connected]);
+      '", size=', FStoreFile.Size, ', ChunkSize=', FChunkSize,
+      ', Data.Connected=', FData.Connected]);
 
     if FData.Connected then
     begin
@@ -985,39 +982,53 @@ begin
           end;
 
         fsRetr: case x of
-            125, 150: begin { Do nothing }
-              end;
+            125, 150:
+            begin
+              Writedbg(['fsRetr: got ', x, ' ("', Ans, '") – waiting for 226']);
+            end;
+            226:
+            begin
+              Writedbg(['fsRetr: got 226 (transfer complete)']);
+              Eventize(FStatus.First.Status, True);
+            end;
+            else
+            begin
+              Writedbg(['fsRetr: got unexpected code ', x, ', disconnecting data']);
+              FData.Disconnect(True);
+              Writedbg(['Disconnecting data connection']);
+              Eventize(FStatus.First.Status, False);
+            end;
           end;
 
-
-            fsStor: case x of
-              125, 150:
-              begin
-                Writedbg(['fsStor: got ', x,
-                          ' (', Ans, '), FStoreFile assigned=',
-                          Assigned(FStoreFile),
-                          ', FSending=', FSending]);
-                if Assigned(FStoreFile) then
-                  SendFile
-                else
-                begin
-                  Writedbg(['fsStor: got 125/150 but FStoreFile=nil, marking STOR as failed']);
-                  Eventize(FStatus.First.Status, False);
-                end;
-              end;
-
-              226:
-              begin
-                Writedbg(['fsStor: got 226 (transfer complete)']);
-                Eventize(FStatus.First.Status, True);
-              end;
-
+        fsStor: case x of
+            125, 150:
+            begin
+              Writedbg(['fsStor: got ', x, ' (', Ans,
+                '), FStoreFile assigned=', Assigned(FStoreFile), ', FSending=',
+                FSending]);
+              if Assigned(FStoreFile) then
+                SendFile
               else
               begin
-                Writedbg(['fsStor: got unexpected code ', x, ' – treating as failure']);
+                Writedbg(
+                  ['fsStor: got 125/150 but FStoreFile=nil, marking STOR as failed']);
                 Eventize(FStatus.First.Status, False);
               end;
             end;
+
+            226:
+            begin
+              Writedbg(['fsStor: got 226 (transfer complete)']);
+              Eventize(FStatus.First.Status, True);
+            end;
+
+            else
+            begin
+              Writedbg(['fsStor: got unexpected code ', x,
+                ' – treating as failure']);
+              Eventize(FStatus.First.Status, False);
+            end;
+          end;
 
         fsCWD: case x of
             200, 250:
@@ -1122,6 +1133,7 @@ begin
               Eventize(FStatus.First.Status, False);
             end;
           end;
+
         fsFeat: case x of
             200..299:
             begin
@@ -1159,6 +1171,7 @@ begin
               Eventize(FStatus.First.Status, False);
             end;
           end;
+
         fsMlst: case x of
             -1, 125, 150: begin { do nothing }
             end;
@@ -1178,6 +1191,7 @@ begin
               Eventize(FStatus.First.Status, False);
             end;
           end;
+
         fsMfmt: case x of
             213, 253:
             begin
@@ -1326,7 +1340,7 @@ begin
     if (not Assigned(FStoreFile)) or (not FSending) then
     begin
       Writedbg(['SendChunk: aborted, FSending=', FSending,
-                ', FStoreFile assigned=', Assigned(FStoreFile)]);
+        ', FStoreFile assigned=', Assigned(FStoreFile)]);
       Exit;
     end;
 
@@ -1336,9 +1350,8 @@ begin
     if n > 0 then
     begin
       Sent := FData.Send(Buf, n);
-      Writedbg(['SendChunk: FData.Send requested=', n,
-                ', sent=', Sent,
-                ', Data.Connected=', FData.Connected]);
+      Writedbg(['SendChunk: FData.Send requested=', n, ', sent=',
+        Sent, ', Data.Connected=', FData.Connected]);
 
       if (not Assigned(FStoreFile)) or (not FSending) then
       begin
@@ -1359,7 +1372,7 @@ begin
       begin
         FStoreFile.Position := FStoreFile.Position - (n - Sent);
         Writedbg(['SendChunk: partial send, rewinding to position ',
-                  FStoreFile.Position]);
+          FStoreFile.Position]);
       end;
     end
     else
@@ -1381,7 +1394,11 @@ begin
       fsUser: User(Args[1]);
       fsPass: Password(Args[1]);
       fsList: List(Args[1]);
-      fsRetr: Retrieve(Args[1]);
+      fsRetr:
+      begin
+        Writedbg(['ExecuteFrontCommand: dequeued fsRetr for "', Args[1], '"']);
+        Retrieve(Args[1]);
+      end;
       fsStor: Put(Args[1]);
       fsCWD: ChangeDirectory(Args[1]);
       fsMKD: MakeDirectory(Args[1]);
@@ -1470,6 +1487,7 @@ begin
   Result := User(aUserName);
 end;
 
+(*
 function TLFTPClient.Retrieve(const FileName: string): boolean;
 begin
   Result := not FPipeLine;
@@ -1481,6 +1499,37 @@ begin
     Result := True;
   end;
 end;
+*)
+function TLFTPClient.Retrieve(const FileName: string): boolean;
+begin
+  Result := not FPipeLine;
+
+  Writedbg(['Retrieve: called for "', FileName, '", PipeLine=',
+    Ord(FPipeLine), ', FStatus.Empty=', Ord(FStatus.Empty),
+    ', FCommandFront.Empty=', Ord(FCommandFront.Empty)]);
+
+  if CanContinue(fsRetr, FileName, '') then
+  begin
+    Writedbg(['Retrieve: CanContinue = YES, issuing PASV+RETR for "', FileName, '"']);
+    PasvPort;
+    FStatus.Insert(MakeStatusRec(fsRetr, '', ''));
+    Writedbg(['Retrieve: inserted fsRetr, FStatus.First=',
+      FTPStatusStr[FStatus.First.Status]]);
+    FControl.SendMessage('RETR ' + FileName + FLE);
+    Result := True;
+  end
+  else
+  begin
+    // Command was queued in FCommandFront by CanContinue
+    if not FStatus.Empty then
+      Writedbg(['Retrieve: CanContinue = NO, queued fsRetr for "',
+        FileName, '" because FStatus.First=', FTPStatusStr[FStatus.First.Status]])
+    else
+      Writedbg(['Retrieve: CanContinue = NO, queued fsRetr for "',
+        FileName, '" with empty FStatus (unexpected).']);
+  end;
+end;
+
 
 (*
 function TLFTPClient.Put(const FileName: string): boolean;
