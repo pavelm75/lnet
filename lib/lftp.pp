@@ -156,6 +156,7 @@ type
     procedure OnControlRe(aSocket: TLSocket);
     procedure OnControlCo(aSocket: TLSocket);
     procedure OnControlDs(aSocket: TLSocket);
+    procedure OnDataConnect(aSocket: TLSocket);
 
     procedure StopSending;
 
@@ -313,12 +314,13 @@ begin
     if High(ar) >= 0 then
       for i := 0 to High(ar) do
         case ar[i].vtype of
-          vtInteger: s := Format('%s%d', [s, ar[i].vinteger]);
-          vtString: s := Format('%s%s', [s, ar[i].vstring^]);
-          vtAnsiString: s := Format('%s%s', [s, ansistring(ar[i].vpointer)]);
-          vtBoolean: s := Format('%s%d', [s, ord(ar[i].vboolean)]);
-          vtChar: s := Format('%s%s', [s, ar[i].vchar]);
-          vtExtended: s := Format('%s%x', [s, Int64(ar[i].vpointer)]);
+          vtInteger:   s := Format('%s%d', [s, ar[i].vinteger]);
+          vtInt64:     s := Format('%s%d', [s, ar[i].vInt64^]);
+          vtString:    s := Format('%s%s', [s, ar[i].vstring^]);
+          vtAnsiString:s := Format('%s%s', [s, ansistring(ar[i].vpointer)]);
+          vtBoolean:   s := Format('%s%d', [s, ord(ar[i].vboolean)]);
+          vtChar:      s := Format('%s%s', [s, ar[i].vchar]);
+          vtExtended:  s := Format('%s%x', [s, Int64(ar[i].vpointer)]);
         end;
 		LNetDebugLogProc(s);
   end
@@ -457,6 +459,7 @@ begin
   FData.OnDisconnect := @OnDs;
   FData.OnCanSend := @OnSe;
   FData.OnError := @OnEr;
+  FData.OnConnect   := @OnDataConnect;
 
   FStatusSet := [fsNone..fsLast]; // full Event set
   FPassWord := '';
@@ -486,26 +489,28 @@ end;
 
 procedure TLFTPClient.OnRe(aSocket: TLSocket);
 begin
+  Writedbg(['OnRe(Data): data received, Connected=', FData.Connected]);
   if Assigned(FOnReceive) then
     FOnReceive(aSocket);
 end;
 
 procedure TLFTPClient.OnDs(aSocket: TLSocket);
 begin
+  Writedbg(['OnDs(Data): Disconnected, FSending=', FSending]);
   StopSending;
-  Writedbg(['Disconnected']);
 end;
 
 procedure TLFTPClient.OnSe(aSocket: TLSocket);
 begin
+  Writedbg(['OnSe(Data): CanSend, Connected=', Connected, ', FSending=', FSending]);
   if Connected and FSending then
     SendChunk(True);
 end;
 
 procedure TLFTPClient.OnEr(const msg: string; aSocket: TLSocket);
 begin
+  Writedbg(['OnEr(Data): ', msg, ', FSending=', FSending]);
   StopSending;
-
   if Assigned(FOnError) then
     FOnError(msg, aSocket);
 end;
@@ -546,6 +551,18 @@ begin
 
   if Assigned(FOnError) then
     FOnError('Connection lost', aSocket);
+end;
+
+procedure TLFTPClient.OnDataConnect(aSocket: TLSocket);
+begin
+  Writedbg(['OnCo(Data): Connected=', FData.Connected,
+            ', Local=', FData.Iterator.LocalAddress, ':', FData.Iterator.LocalPort,
+            ', Remote=', FData.Iterator.PeerAddress, ':', FData.Iterator.PeerPort,
+            ', FSending=', FSending]);
+
+  // If an upload is pending, kick off sending now
+  if FSending and Assigned(FStoreFile) then
+    SendChunk(True);
 end;
 
 procedure TLFTPClient.StopSending;
@@ -787,8 +804,17 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
 
       if (aPort > 0) and FData.Connect(aIP, aPort) then
       begin
-        Writedbg(['Connected after PASV']);
-        Sleep(50); // if you ever need this for CE again
+        Writedbg(['Connected after PASV',
+                  ', Data.Connected=', FData.Connected,
+                  ', Local=', FData.Iterator.LocalAddress,
+                  ':', FData.Iterator.LocalPort,
+                  ', Remote=', FData.Iterator.PeerAddress,
+                  ':', FData.Iterator.PeerPort]);
+        // Sleep(50);
+      end
+      else
+      begin
+        Writedbg(['FAILED to connect after PASV to ', aIP, ':', aPort]);
       end;
 
       FStatus.Remove;
@@ -797,12 +823,40 @@ procedure TLFTPClient.EvaluateAnswer(const Ans: string);
     end;
   end;
 
-
+  (*
   procedure SendFile;
   begin
     FStoreFile.Position := 0;
     FSending := True;
     SendChunk(False);
+  end;
+  *)
+  procedure SendFile;
+  begin
+    if not Assigned(FStoreFile) then
+    begin
+      Writedbg(['SendFile: FStoreFile=nil – nothing to send']);
+      Exit;
+    end;
+
+    FStoreFile.Position := 0;
+    FSending := True;
+
+    Writedbg(['SendFile: starting upload of "', FStatus.First.Args[1],
+              '", size=', FStoreFile.Size,
+              ', ChunkSize=', FChunkSize,
+              ', Data.Connected=', FData.Connected]);
+
+    if FData.Connected then
+    begin
+      Writedbg(['SendFile: data socket already connected – doing initial SendChunk']);
+      SendChunk(False);
+    end
+    else
+    begin
+      Writedbg(['SendFile: data socket NOT yet connected – waiting for OnDataConnect']);
+      // OnDataConnect will call SendChunk(True) when the connect event fires
+    end;
   end;
 
   function ValidResponse(const Answer: string): boolean; inline;
@@ -932,43 +986,38 @@ begin
 
         fsRetr: case x of
             125, 150: begin { Do nothing }
-            end;
-            226:
-            begin
-              Eventize(FStatus.First.Status, True);
-            end;
-            else
-            begin
-              FData.Disconnect(True);
-              // break on purpose, otherwise we get invalidated ugly
-              Writedbg(['Disconnecting data connection']);
-              Eventize(FStatus.First.Status, False);
-            end;
+              end;
           end;
 
-        fsStor: case x of
-            125, 150:
-            begin
-              // Only start sending if we still have a valid file stream
-              if Assigned(FStoreFile) then
-                SendFile
+
+            fsStor: case x of
+              125, 150:
+              begin
+                Writedbg(['fsStor: got ', x,
+                          ' (', Ans, '), FStoreFile assigned=',
+                          Assigned(FStoreFile),
+                          ', FSending=', FSending]);
+                if Assigned(FStoreFile) then
+                  SendFile
+                else
+                begin
+                  Writedbg(['fsStor: got 125/150 but FStoreFile=nil, marking STOR as failed']);
+                  Eventize(FStatus.First.Status, False);
+                end;
+              end;
+
+              226:
+              begin
+                Writedbg(['fsStor: got 226 (transfer complete)']);
+                Eventize(FStatus.First.Status, True);
+              end;
+
               else
               begin
-                Writedbg(
-                  ['fsStor: got 125/150 but FStoreFile=nil, marking STOR as failed']);
+                Writedbg(['fsStor: got unexpected code ', x, ' – treating as failure']);
                 Eventize(FStatus.First.Status, False);
               end;
             end;
-
-            226:
-            begin
-              Eventize(FStatus.First.Status, True);
-            end;
-            else
-            begin
-              Eventize(FStatus.First.Status, False);
-            end;
-          end;
 
         fsCWD: case x of
             200, 250:
@@ -1216,6 +1265,7 @@ begin
   end;
 end;
 
+(*
 procedure TLFTPClient.SendChunk(const Event: boolean);
 var
   Buf: array[0..65535] of byte;
@@ -1259,6 +1309,69 @@ begin
     end;
   until (n = 0) or (Sent = 0);
 end;
+*)
+procedure TLFTPClient.SendChunk(const Event: boolean);
+var
+  Buf: array[0..65535] of byte;
+  n: integer;
+  Sent: integer;
+begin
+  if not Assigned(FStoreFile) then
+  begin
+    Writedbg(['SendChunk: FStoreFile=nil – aborting']);
+    Exit;
+  end;
+
+  repeat
+    if (not Assigned(FStoreFile)) or (not FSending) then
+    begin
+      Writedbg(['SendChunk: aborted, FSending=', FSending,
+                ', FStoreFile assigned=', Assigned(FStoreFile)]);
+      Exit;
+    end;
+
+    n := FStoreFile.Read(Buf, FChunkSize);
+    Writedbg(['SendChunk: read n=', n, ' bytes, pos=', FStoreFile.Position]);
+
+    if n > 0 then
+    begin
+      Sent := FData.Send(Buf, n);
+      Writedbg(['SendChunk: FData.Send requested=', n,
+                ', sent=', Sent,
+                ', Data.Connected=', FData.Connected]);
+
+      if (not Assigned(FStoreFile)) or (not FSending) then
+      begin
+        Writedbg(['SendChunk: aborted after Send, FSending=', FSending]);
+        Exit;
+      end;
+
+      if Event and Assigned(FOnSent) and (Sent > 0) then
+        FOnSent(FData.Iterator, Sent);
+
+      if (not Assigned(FStoreFile)) or (not FSending) then
+      begin
+        Writedbg(['SendChunk: aborted after FOnSent, FSending=', FSending]);
+        Exit;
+      end;
+
+      if Sent < n then
+      begin
+        FStoreFile.Position := FStoreFile.Position - (n - Sent);
+        Writedbg(['SendChunk: partial send, rewinding to position ',
+                  FStoreFile.Position]);
+      end;
+    end
+    else
+    begin
+      Writedbg(['SendChunk: EOF reached, closing data connection']);
+      if Assigned(FOnSent) then
+        FOnSent(FData.Iterator, 0);
+      StopSending;
+      FData.Disconnect(False);
+    end;
+  until (n = 0) or (Sent = 0);
+end;
 
 procedure TLFTPClient.ExecuteFrontCommand;
 begin
@@ -1291,9 +1404,8 @@ function TLFTPClient.Get(out aData; const aSize: integer; aSocket: TLSocket): in
 var
   s: string;
 begin
-  Result := 0;
-
-  if FControl.Get(aData, aSize, aSocket) > 0 then
+  Result := FControl.Get(aData, aSize, aSocket);
+  if Result > 0 then
   begin
     SetLength(s, Result);
     Move(aData, PChar(s)^, Result);
@@ -1370,6 +1482,7 @@ begin
   end;
 end;
 
+(*
 function TLFTPClient.Put(const FileName: string): boolean;
 begin
   Result := not FPipeLine;
@@ -1380,6 +1493,29 @@ begin
     FStatus.Insert(MakeStatusRec(fsStor, '', ''));
     FControl.SendMessage('STOR ' + ExtractFileName(FileName) + FLE);
     Result := True;
+  end;
+end;
+*)
+function TLFTPClient.Put(const FileName: string): boolean;
+begin
+  Result := not FPipeLine;
+  if FileExists(FileName) and CanContinue(fsStor, FileName, '') then
+  begin
+    Writedbg(['Put: preparing upload of "', FileName, '"']);
+    FStoreFile := TFileStream.Create(FileName, fmOpenRead);
+    Writedbg(['Put: FStoreFile.Size=', FStoreFile.Size]);
+
+    PasvPort;
+    FStatus.Insert(MakeStatusRec(fsStor, FileName, ''));
+    FControl.SendMessage('STOR ' + ExtractFileName(FileName) + FLE);
+    Result := True;
+  end
+  else
+  begin
+    if not FileExists(FileName) then
+      Writedbg(['Put: File does not exist: ', FileName])
+    else
+      Writedbg(['Put: Cannot continue (pipeline busy) for ', FileName]);
   end;
 end;
 
